@@ -41,9 +41,9 @@ static inline uint BSWAP32(uint x) {
     return x;
 }
 #if _MSC_VER
-#define UNREACHABLE()           
+#define UNREACHABLE()       
 #else
-#define UNREACHABLE()           exit(1) // [[noreturn]]
+#define UNREACHABLE()
 #endif
 
 #endif
@@ -1209,7 +1209,33 @@ static inline double indexedLerp(uchar idx, double a, double b, double c)
   void initBiomeNoise(BiomeNoise *bn, int mc)
 {
     SplineStack *ss = &bn->ss;
-    memset(ss, 0, sizeof(*ss));
+    *ss = (SplineStack){};
+    //memset(ss, 0, sizeof(*ss));
+    /*
+        STRUCT(SplineStack)
+        {   // the stack size here is just sufficient for overworld generation
+            //9616 bytes
+            Spline stack[42]; //8400 bytes
+            FixSpline fstack[151]; //1208 bytes
+            int len, flen; //8 bytes
+        };
+    */
+    /*
+        STRUCT(FixSpline)
+        {
+            int len; //4 bytes
+            float val; //4 bytes
+        };
+    */
+    /*
+        STRUCT(Spline)
+        {
+            int len, typ; //8 bytes
+            float loc[12]; //48 bytes
+            float der[12]; //48 bytes
+            Spline *val[12]; //96 bytes
+        };
+    */
     Spline *sp = &ss->stack[ss->len++];
     sp->typ = SP_CONTINENTALNESS;
 
@@ -1243,7 +1269,7 @@ static inline double indexedLerp(uchar idx, double a, double b, double c)
         w = sampleDoublePerlin(bn->climate + NP_WEIRDNESS, x, 0, z);
 
         float np_param[] = {
-            c, e, -3.0F * ( fabsf( fabsf(w) - 0.6666667F ) - 0.33333334F ), w,
+            c, e, -3.0F * ( fabs( fabs(w) - 0.6666667F ) - 0.33333334F ), w,
         };
         printf("GETTING SPLINE\n");
         double off = getSpline(bn->sp, np_param) + 0.015F;
@@ -1264,7 +1290,7 @@ static inline double indexedLerp(uchar idx, double a, double b, double c)
     return p;
 }
 
-  ulong get_np_dist(const ulong np[6], const BiomeTree *bt, int idx)
+  ulong get_np_dist(__generic const ulong np[6], const BiomeTree *bt, int idx)
 {
     ulong ds = 0, node = bt->nodes[idx];
     ulong a, b, d;
@@ -1282,7 +1308,7 @@ static inline double indexedLerp(uchar idx, double a, double b, double c)
     return ds;
 }
 
-  int get_resulting_node_new(const ulong np[6], const BiomeTree *bt) {
+  int get_resulting_node_new(__generic const ulong np[6], const BiomeTree *bt) {
     ulong best_distance = 9999999999;
     int best_biome = -1;
     for (size_t i = 0; i < 9112; i++) {
@@ -1311,13 +1337,11 @@ static inline double indexedLerp(uchar idx, double a, double b, double c)
     return best_biome;
 }
 
-#include <inttypes.h>
-
 enum { btree20_order = 6 };
 
- static const uint btree20_steps[] = { 1555, 259, 43, 7, 1, 0 };
+static const uint btree20_steps[] = { 1555, 259, 43, 7, 1, 0 };
 
- static const int btree20_param[][2] =
+static const int btree20_param[][2] =
 {
     {-12000,-10500},{-12000, -4550},{-12000, 10000},{-10500, -4550}, // 00-03
     {-10500, -1900},{-10500, 10000},{-10000, -9333},{-10000, -7799}, // 04-07
@@ -3681,7 +3705,7 @@ typedef struct {
     return stack->frames[stack->pointer];
 }
 
-  int get_resulting_node_improved(const ulong np[6], const BiomeTree *bt) {
+  int get_resulting_node_improved(__generic const ulong np[6], const BiomeTree *bt) {
     Stack stack;
     stack.pointer = 0;
     
@@ -3747,7 +3771,7 @@ typedef struct {
         sizeof(btree20_nodes) / sizeof(ulong) },
 };
 
-  int climateToBiome(int mc, const ulong np[6], ulong *dat)
+  int climateToBiome(int mc, __generic const ulong np[6], ulong *dat)
 {
     if (mc < MC_1_18 || mc > MC_NEWEST)
         return -1;
@@ -3768,7 +3792,8 @@ typedef struct {
     if (bn->nptype >= 0)
     {   // initialized for a specific climate parameter
         if (np)
-            memset(np, 0, NP_MAX*sizeof(*np));
+            *np = 0;
+            //memset(np, 0, NP_MAX*sizeof(*np));
         long id = (long) (10000.0 * sampleClimatePara(bn, np, x, z));
         return (int) id;
     }
@@ -3817,6 +3842,7 @@ typedef struct {
 {
     int i = 0;
     //memset(noise, 0, sizeof(*noise));
+    *noise = (PerlinNoise){};
     noise->a = xNextDouble(xr) * 256.0;
     noise->b = xNextDouble(xr) * 256.0;
     noise->c = xNextDouble(xr) * 256.0;
@@ -4080,7 +4106,8 @@ Pos getFeaturePos(StructureConfig config, ulong seed, int regX, int regZ)
 
   int getStructureConfig(int structureType, int mc, StructureConfig *sconf)
 {
-    static const StructureConfig
+    //static const
+    StructureConfig
     // for desert pyramids, jungle temples, witch huts and igloos prior to 1.13
     s_feature               = { 14357617, 32, 24, Feature,          0,0},
     s_igloo_112             = { 14357617, 32, 24, Igloo,            0,0},
@@ -4217,21 +4244,22 @@ Pos getFeaturePos(StructureConfig config, ulong seed, int regX, int regZ)
         *sconf = s_trial_chambers;
         return mc >= MC_1_21;
     default:
-        memset(sconf, 0, sizeof(StructureConfig));
+        //memset(sconf, 0, sizeof(StructureConfig));
+        *sconf = (StructureConfig){};
         return 0;
     }
 }
 
 STRUCT(StructureVariant)
 {
-    uchar abandoned   :1; // is zombie village
-    uchar giant       :1; // giant portal variant
-    uchar underground :1; // underground portal
-    uchar airpocket   :1; // portal with air pocket
-    uchar basement    :1; // igloo with basement
-    uchar cracked     :1; // geode with crack
-    uchar size;           // geode size | igloo middel pieces
-    uchar start;          // starting piece index
+    bool abandoned; // is zombie village
+    bool giant; // giant portal variant
+    bool underground; // underground portal
+    bool airpocket; // portal with air pocket
+    bool basement; // igloo with basement
+    bool cracked; // geode with crack
+    bool size;           // geode size | igloo middel pieces
+    bool start;          // starting piece index
     char   biome;          // biome variant
     uchar rotation;       // 0:0, 1:cw90, 2:cw180, 3:cw270=ccw90
     uchar mirror;
@@ -4525,7 +4553,7 @@ ulong chunkGenerateRnd(ulong worldSeed, int chunkX, int chunkZ)
 
   int *allocCache(const Generator *g, Range r)
 {
-  cudaError_t err = cudaSuccess;
+  //cudaError_t err = cudaSuccess;
 	size_t len = getMinCacheSize(g, r.scale, r.sx, r.sy, r.sz);
   int *__temp = (int *)malloc(len * sizeof(int));
 	for (size_t __idx = 0; __idx < len; ++__idx) __temp[__idx] = 0;
@@ -4557,7 +4585,8 @@ ulong chunkGenerateRnd(ulong worldSeed, int chunkX, int chunkZ)
     char sx, sy, sz;
     ulong rng = chunkGenerateRnd(seed, x >> 4, z >> 4);
 
-    memset(r, 0, sizeof(*r));
+    //memset(r, 0, sizeof(*r));
+    *r = (StructureVariant){};
     r->start = -1;
     r->biome = -1;
     r->y = 320;
@@ -4679,11 +4708,11 @@ ulong chunkGenerateRnd(ulong worldSeed, int chunkX, int chunkZ)
     return 0;
 }
 
- int best = 9999;
+__constant int best = 9999;
 
- int radius = 5;
+__constant int radius = 5;
 
-kernel void find(ulong *data, ulong *out) {
+kernel void find(__global ulong *data, __global ulong *out) {
     int id = get_global_id(0);
     ulong originalSeed = (((ulong)data[0] * (ulong)data[1] + (ulong)id) << 4) | data[8];
 
@@ -4697,7 +4726,7 @@ kernel void find(ulong *data, ulong *out) {
     StructureConfig sconf;
     getStructureConfig(Village, mc, &sconf);
 
-    ulong seed = input_seed;
+    ulong seed = originalSeed;
     applySeed(&g, DIM_OVERWORLD, seed);
 
     int villages = 0;

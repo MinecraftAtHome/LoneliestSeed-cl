@@ -147,6 +147,7 @@ int main(int argc, char **argv) {
         fprintf(stderr,"Failed to open kernel\n");
         exit(1);
     }
+    fprintf(stderr, "Beginning OpenCL init.\n");
     char *kernel_src = (char *)malloc(KERNEL_BUFFER_SIZE);
     size_t kernel_length = fread(kernel_src, 1, KERNEL_BUFFER_SIZE, kernel_file);
     fclose(kernel_file);
@@ -155,9 +156,11 @@ int main(int argc, char **argv) {
     //Create cl context using props
     cl_context context = clCreateContext(cps, 1, &device_ids, NULL, NULL, &err);
     check(err, "clCreateContext ");
+    fprintf(stderr, "Created cl context.\n");
     //Create cl command queue
     cl_command_queue command_queue = clCreateCommandQueueWithProperties(context, device_ids, 0, &err);
     check(err, "clCreateCommandQueueWithProperties ");
+    fprintf(stderr, "Created command queue.\n");
 
     seedbuffer_size = blocks * threads * sizeof(cl_ulong);
     // 4 MB of memory for seeds
@@ -165,6 +168,8 @@ int main(int argc, char **argv) {
     check(err, "clCreateBuffer (seeds) ");
     cl_mem data = clCreateBuffer(context, CL_MEM_READ_ONLY, 10 * sizeof(int), NULL, &err);
     check(err, "clCreateBuffer (data) ");
+    fprintf(stderr, "Initialized buffers for seeds and data.\n");
+
     //Create program from kernel
     cl_program program = clCreateProgramWithSource(
             context,
@@ -172,9 +177,11 @@ int main(int argc, char **argv) {
             (const char **) &kernel_src,
             &kernel_length,
             &err);
+
     check(err, "clCreateProgramWithSource ");
     char *opt = (char *) malloc(20 * sizeof(char));
     err = clBuildProgram(program, 1, &device_ids, NULL, NULL, NULL);
+    fprintf(stderr, "Built kernel.\n");
     if (err != CL_SUCCESS) {
         size_t len;
         clGetProgramBuildInfo(program, device_ids, CL_PROGRAM_BUILD_LOG, 0, NULL, &len);
@@ -186,9 +193,10 @@ int main(int argc, char **argv) {
     }
     cl_kernel kernel = clCreateKernel(program, "find", &err);
     check(err, "clCreateKernel ");
+    fprintf(stderr, "Created kernel from build.\n");
     check(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &data), "clSetKernelArg (0) ");
-    check(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &seeds), "clSetKernelArg (1) ");
-
+    check(clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *) &seeds), "clSetKernelArg (1) ");
+    fprintf(stderr, "Set kernel arguments\n");
     size_t work_unit_size = 1048576;
     size_t block_size = 256;
     arguments[1] = work_unit_size;
@@ -199,7 +207,7 @@ int main(int argc, char **argv) {
     double seedrange = (block_max - block_min);
     int checkpointTemp = 0;
     cl_ulong found_seeds[MAX_SEED_BUFFER_SIZE];
-
+    fprintf(stderr, "Beginning work...\n");
     auto start = high_resolution_clock::now();
     //Kernel loop
     for (uint64_t s = (uint64_t)block_min + offsetStart; s < (uint64_t)block_max; s++) {
@@ -209,18 +217,21 @@ int main(int argc, char **argv) {
         //GPU_ASSERT(cudaPeekAtLastError());
         //GPU_ASSERT(cudaDeviceSynchronize());  
 
+        fprintf(stderr, "Writing to buffer...\n");
         check(clEnqueueWriteBuffer(command_queue, data, CL_TRUE, 0, 2 * sizeof(int), arguments, 0, NULL, NULL),
               "clEnqueueWriteBuffer ");
+        fprintf(stderr, "Queueing kernel...\n");
         check(clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL, &work_unit_size, &block_size, 0, NULL, NULL),
               "clEnqueueNDRangeKernel ");
-
         int *data_out = (int *) malloc(sizeof(int) * 10);
+        fprintf(stderr, "pulling data out...\n");
         check(clEnqueueReadBuffer(command_queue, data, CL_TRUE, 0, sizeof(int) * 2, data_out, 0, NULL, NULL),
               "clEnqueueReadBuffer (data) ");
-
+        fprintf(stderr, "Pulled data!\n");
         seedbuffer_size = sizeof(cl_ulong) * blocks * threads;
-
+        fprintf(stderr, "Mallocing result buffer\n");
         cl_ulong *result = (cl_ulong *) malloc(sizeof(cl_ulong) + sizeof(cl_ulong) * blocks * threads);
+        fprintf(stderr, "Pulling seeds...\n");
         check(clEnqueueReadBuffer(command_queue, seeds, CL_TRUE, 0, seedbuffer_size, result, 0, NULL, NULL), "clEnqueueReadBuffer (seeds) ");
 
         checkpointTemp += 1;
@@ -244,10 +255,11 @@ int main(int argc, char **argv) {
             boinc_checkpoint_completed(); // Checkpointing completed
         }
         #endif
+        fprintf(stderr, "Pulling seed data out to print to file...\n");
         for (unsigned long long i = 0; i < blocks * threads; i++){
-            if(out[i] > 0){
-			    fprintf(seedsout,"%llu\n", out[i]);
-                out[i] = 0;
+            if(result[i] > 0){
+			    fprintf(seedsout,"%llu\n", result[i]);
+                result[i] = 0;
                 //out_villages[i] = 0;
             }
 
