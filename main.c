@@ -211,27 +211,19 @@ int main(int argc, char **argv) {
     auto start = high_resolution_clock::now();
     //Kernel loop
     for (uint64_t s = (uint64_t)block_min + offsetStart; s < (uint64_t)block_max; s++) {
-        arguments[0] = s / work_unit_size;
+        arguments[0] = s;
         //kernel<<<blocks, threads>>>(blocks * threads * s, out);
 
         //GPU_ASSERT(cudaPeekAtLastError());
         //GPU_ASSERT(cudaDeviceSynchronize());  
 
-        fprintf(stderr, "Writing to buffer...\n");
-        check(clEnqueueWriteBuffer(command_queue, data, CL_TRUE, 0, 2 * sizeof(int), arguments, 0, NULL, NULL),
-              "clEnqueueWriteBuffer ");
-        fprintf(stderr, "Queueing kernel...\n");
-        check(clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL, &work_unit_size, &block_size, 0, NULL, NULL),
-              "clEnqueueNDRangeKernel ");
-        int *data_out = (int *) malloc(sizeof(int) * 10);
-        fprintf(stderr, "pulling data out...\n");
-        check(clEnqueueReadBuffer(command_queue, data, CL_TRUE, 0, sizeof(int) * 2, data_out, 0, NULL, NULL),
-              "clEnqueueReadBuffer (data) ");
-        fprintf(stderr, "Pulled data!\n");
-        seedbuffer_size = sizeof(cl_ulong) * blocks * threads;
-        fprintf(stderr, "Mallocing result buffer\n");
-        cl_ulong *result = (cl_ulong *) malloc(sizeof(cl_ulong) + sizeof(cl_ulong) * blocks * threads);
-        fprintf(stderr, "Pulling seeds...\n");
+        check(clEnqueueWriteBuffer(command_queue, data, CL_TRUE, 0, 2 * sizeof(int), arguments, 0, NULL, NULL),"clEnqueueWriteBuffer ");
+        check(clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL, &work_unit_size, &block_size, 0, NULL, NULL),"clEnqueueNDRangeKernel ");
+        
+        int *data_out = (int *) malloc(sizeof(int) * 2);
+        check(clEnqueueReadBuffer(command_queue, data, CL_TRUE, 0, sizeof(int) * 2, data_out, 0, NULL, NULL),"clEnqueueReadBuffer (data) ");
+        seedbuffer_size = sizeof(cl_ulong)* blocks * threads;
+        cl_ulong *result = (cl_ulong *) malloc(seedbuffer_size);
         check(clEnqueueReadBuffer(command_queue, seeds, CL_TRUE, 0, seedbuffer_size, result, 0, NULL, NULL), "clEnqueueReadBuffer (seeds) ");
 
         checkpointTemp += 1;

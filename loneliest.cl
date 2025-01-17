@@ -4258,9 +4258,9 @@ STRUCT(StructureVariant)
     bool airpocket; // portal with air pocket
     bool basement; // igloo with basement
     bool cracked; // geode with crack
-    bool size;           // geode size | igloo middel pieces
-    bool start;          // starting piece index
-    char   biome;          // biome variant
+    char size;           // geode size | igloo middel pieces
+    char start;          // starting piece index
+    short   biome;          // biome variant
     uchar rotation;       // 0:0, 1:cw90, 2:cw180, 3:cw270=ccw90
     uchar mirror;
     char x, y, z;
@@ -4710,12 +4710,12 @@ ulong chunkGenerateRnd(ulong worldSeed, int chunkX, int chunkZ)
 
 __constant int best = 9999;
 
-__constant int radius = 5;
+__constant int radius = 1;
 
 kernel void find(__global ulong *data, __global ulong *out) {
     int id = get_global_id(0);
-    ulong originalSeed = (((ulong)data[0] * (ulong)data[1] + (ulong)id) << 4) | data[8];
-
+    ulong originalSeed = id + data[0];
+    
     //ulong input_seed = blockDim.x * blockIdx.x + threadIdx.x + s;
     int structType = Village;
     int mc = MC_1_20;
@@ -4742,5 +4742,5 @@ kernel void find(__global ulong *data, __global ulong *out) {
        		}
         }
     }
-    out[((ulong)data[0] * (ulong)data[1] + (ulong)id)] = seed;
+    out[data[0]] = seed;
 }
