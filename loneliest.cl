@@ -1,3 +1,5 @@
+
+
 ///=============================================================================
 ///                      Compiler and Platform Features
 ///=============================================================================
@@ -704,7 +706,7 @@ STRUCT(Pos)  { int x, z; };
 
 STRUCT(Layer)
 {
-    mapfunc_t *getMap;
+    //mapfunc_t *getMap;
 
     char mc;          // minecraft version
     char zoom;        // zoom factor of layer
@@ -4520,7 +4522,6 @@ ulong chunkGenerateRnd(ulong worldSeed, int chunkX, int chunkZ)
     return len;
 }
 
-#include <cuda.h>
 
   int *allocCache(const Generator *g, Range r)
 {
@@ -4682,12 +4683,14 @@ ulong chunkGenerateRnd(ulong worldSeed, int chunkX, int chunkZ)
 
  int radius = 5;
 
-kernel void find(ulong s, ulong *out) {
-    ulong input_seed = blockDim.x * blockIdx.x + threadIdx.x + s;
+kernel void find(ulong *data, ulong *out) {
+    int id = get_global_id(0);
+    ulong originalSeed = (((ulong)data[0] * (ulong)data[1] + (ulong)id) << 4) | data[8];
+
+    //ulong input_seed = blockDim.x * blockIdx.x + threadIdx.x + s;
     int structType = Village;
     int mc = MC_1_20;
     int region_size = 34;
-    
     int size = 5 * region_size;
     Generator g;
     setupGenerator(&g, mc, 0);
@@ -4710,5 +4713,5 @@ kernel void find(ulong s, ulong *out) {
        		}
         }
     }
-    out[blockDim.x * blockIdx.x + threadIdx.x] = seed;
+    out[((ulong)data[0] * (ulong)data[1] + (ulong)id)] = seed;
 }

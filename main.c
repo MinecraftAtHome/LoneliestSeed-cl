@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
             &err);
     check(err, "clCreateProgramWithSource ");
     char *opt = (char *) malloc(20 * sizeof(char));
-    err = clBuildProgram(program, 1, &device_ids, opt, NULL, NULL);
+    err = clBuildProgram(program, 1, &device_ids, NULL, NULL, NULL);
     if (err != CL_SUCCESS) {
         size_t len;
         clGetProgramBuildInfo(program, device_ids, CL_PROGRAM_BUILD_LOG, 0, NULL, &len);
@@ -186,8 +186,9 @@ int main(int argc, char **argv) {
     }
     cl_kernel kernel = clCreateKernel(program, "find", &err);
     check(err, "clCreateKernel ");
-    check(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &seeds), "clSetKernelArg (0) ");
-    check(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &data), "clSetKernelArg (1) ");
+    check(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &data), "clSetKernelArg (0) ");
+    check(clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &seeds), "clSetKernelArg (1) ");
+
     size_t work_unit_size = 1048576;
     size_t block_size = 256;
     arguments[1] = work_unit_size;
@@ -202,19 +203,19 @@ int main(int argc, char **argv) {
     auto start = high_resolution_clock::now();
     //Kernel loop
     for (uint64_t s = (uint64_t)block_min + offsetStart; s < (uint64_t)block_max; s++) {
-
+        arguments[0] = s / work_unit_size;
         //kernel<<<blocks, threads>>>(blocks * threads * s, out);
 
         //GPU_ASSERT(cudaPeekAtLastError());
         //GPU_ASSERT(cudaDeviceSynchronize());  
 
-        check(clEnqueueWriteBuffer(command_queue, data, CL_TRUE, 0, 10 * sizeof(int), arguments, 0, NULL, NULL),
+        check(clEnqueueWriteBuffer(command_queue, data, CL_TRUE, 0, 2 * sizeof(int), arguments, 0, NULL, NULL),
               "clEnqueueWriteBuffer ");
         check(clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL, &work_unit_size, &block_size, 0, NULL, NULL),
               "clEnqueueNDRangeKernel ");
 
         int *data_out = (int *) malloc(sizeof(int) * 10);
-        check(clEnqueueReadBuffer(command_queue, data, CL_TRUE, 0, sizeof(int) * 10, data_out, 0, NULL, NULL),
+        check(clEnqueueReadBuffer(command_queue, data, CL_TRUE, 0, sizeof(int) * 2, data_out, 0, NULL, NULL),
               "clEnqueueReadBuffer (data) ");
 
         seedbuffer_size = sizeof(cl_ulong) * blocks * threads;
